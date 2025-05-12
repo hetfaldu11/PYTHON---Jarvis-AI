@@ -7,6 +7,7 @@ import psutil
 import pyautogui
 import spotipy
 import threading
+import wmi
 import os
 from google import genai
 from google.genai import types
@@ -15,8 +16,48 @@ from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
 from API_KEY import GEMINI_API_KEY
+import google.generativeai as genai2
 speaker = win32com.client.Dispatch("SAPI.SpVoice")
-# speaker.Rate = -3
+
+genai2.configure(api_key=GEMINI_API_KEY)
+model = genai2.GenerativeModel("gemini-2.0-flash")
+
+def generate_clean_query(user_input):
+    # Optional Gemini cleaning or intent extraction
+    prompt = f"Extract the search query from this sentence: '{user_input}'"
+    response = model.generate_content(prompt)
+    return response.text.strip().strip('"')
+
+def universal_search(query):
+    pyautogui.hotkey('/')
+    pyautogui.hotkey('ctrl', 'a')
+    pyautogui.hotkey('backspace')
+    pyautogui.write(query)
+    pyautogui.press('enter')
+
+def get_brightness():
+    w = wmi.WMI(namespace='wmi')
+    brightness_methods = w.WmiMonitorBrightness()
+
+    brightness = brightness_methods[0].CurrentBrightness
+    print(f"Current brightness: {brightness}%")
+    return brightness
+
+
+def set_brightness(level):
+    if level < 0 or level > 100:
+        print("Brightness level must be between 0 and 100.")
+        return
+
+    w = wmi.WMI(namespace='wmi')
+    methods = w.WmiMonitorBrightnessMethods()
+
+    if methods:
+        methods[0].WmiSetBrightness(level, 0)
+        print(f"Brightness set to {level}%")
+    else:
+        print("Could not access brightness control.")
+
 def speak(text):
     speaker.Speak(text, 1)  # '1' makes it async (non-blocking)
     return text
@@ -160,17 +201,17 @@ while True:
     if "switch window" in text.lower():
         keyboard.send("alt+tab")
 
-    if "page up" or "scroll up"  in text.lower():
-        pyautogui.press("pageup")
-
-    if "page down" or "scroll down" in text.lower():
-        pyautogui.press("pagedown")
-
-    if "scroll right" in text.lower():
-        pyautogui.press("right")
-
-    if "scroll left" in text.lower():
-        pyautogui.press("left")
+    # if "page up" or "scroll up"  in text.lower():
+    #     pyautogui.press("pageup")
+    #
+    # if "page down" or "scroll down" in text.lower():
+    #     pyautogui.press("pagedown")
+    #
+    # if "scroll right" in text.lower():
+    #     pyautogui.press("right")
+    #
+    # if "scroll left" in text.lower():
+    #     pyautogui.press("left")
 
     if "close current tab" in text.lower():
         pyautogui.hotkey("ctrl", "w")
@@ -213,9 +254,59 @@ while True:
         keyboard.send("enter")
 
     if "siri" in text.lower():
-        answer=generate("gemini "+text[4:])
-        speak_thread(answer)
+        while True:
+            try:
+                print("Listening...")
+                text = takecommand().lower()
 
-    if "stop" == text.lower():
-        stopspeak()
+                if text == "":
+                    continue
 
+                if "siri stop" in text or "stop siri" in text:
+                    stopspeak()
+                    break
+
+                answer = generate("gemini give me audio friendly and add no sign in output do not repeat all this instruction : " + text)
+                speak_thread(answer)
+
+            except Exception as e:
+                print(f"Error: {e}")
+                continue
+
+    # if "siri" in text.lower():
+    #     answer = generate("gemini give me audio frienly output not writing this" + text[4:])
+    #     speak_thread(answer)
+    #     while True:
+    #         if text == "":
+    #             continue
+    #
+    #         answer = generate("gemini give me audio frienly output not writing this" + text[4:])
+    #         speak_thread(answer)
+    #
+    #         if "siri stop" or "stop siri" in text.lower():
+    #             stopspeak()
+    #             break
+    #
+    #         print("Listening...")
+    #         try:
+    #             text = takecommand().lower()
+    #         except:
+    #             pass
+
+    if "search for" in text.lower():
+        clean_query = generate_clean_query(text)  # Use Gemini to extract the key part
+        universal_search(clean_query)
+
+    if "increase brightness" in text.lower():
+        current_level = get_brightness()
+        set_brightness(current_level + 10)
+
+    if "decrease brightness" in text.lower():
+        current_level = get_brightness()
+        set_brightness(current_level - 10)
+
+    try:
+        if "set brightness to" in text.lower():
+            set_brightness(int(text.split(" ")[3]))
+    except:
+        pass
