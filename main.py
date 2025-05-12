@@ -133,7 +133,6 @@ def open_song_in_browser(song_name):
     song_url = track['external_urls']['spotify']
     print(f"Opening: {track['name']} by {track['artists'][0]['name']}")
 
-    # Open using OS-level call (or you can use webbrowser.open too)
     os.system(f'start {song_url}')  # For Windows
 
 print(speak("Hello I am Jarvis A.I."))
