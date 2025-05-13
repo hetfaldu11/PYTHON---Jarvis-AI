@@ -1,4 +1,6 @@
 import webbrowser
+from operator import truediv
+
 import speech_recognition as sr
 import time
 import keyboard
@@ -16,6 +18,7 @@ from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
 from API_KEY import GEMINI_API_KEY
+from API_KEY import conversation_number
 import google.generativeai as genai2
 speaker = win32com.client.Dispatch("SAPI.SpVoice")
 
@@ -34,6 +37,17 @@ def universal_search(query):
     pyautogui.hotkey('backspace')
     pyautogui.write(query)
     pyautogui.press('enter')
+
+def update_variable_in_file(new_value,filename="API_KEY.py", var_name="conversation_number"):
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+
+    with open(filename, 'w') as f:
+        for line in lines:
+            if line.strip().startswith(f"{var_name} ="):
+                f.write(f"{var_name} = {new_value}\n")
+            else:
+                f.write(line)
 
 def get_brightness():
     w = wmi.WMI(namespace='wmi')
@@ -65,7 +79,7 @@ def speak(text):
 def speak_thread(text):
     threading.Thread(target=speak, args=(text,)).start()
 
-def stopspeak():
+def stop_speak():
     speaker.Speak("", 3)
 
 def is_wifi_enabled():
@@ -148,29 +162,43 @@ while True:
     if text == "":
         continue
     # speak(text)
-
-    # if "open youtube" in text.lower():
-    #     os.startfile("C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Chrome Apps/youtube.lnk")
-    # elif "open github" in text.lower():
-    #     os.startfile("C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Chrome Apps/github.lnk")
-    #
-    # elif "open classroom" in text.lower():
-    #     os.startfile(
-    #         "C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Chrome Apps/Google Classroom.lnk")
-    # elif "open keep" in text.lower():
-    #     os.startfile(
-    #         "C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Chrome Apps/Google Keep.lnk")
-    # elif "open drive" in text.lower():
-    #     os.startfile(
-    #         "C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Chrome Apps/Google Drive.lnk")
-    if "open side panel" in text.lower():
-        keyboard.send("win+a")
-
-    elif "open file explorer" in text.lower():
-        keyboard.send("win+e")
-
-    elif "hello" in text.lower():
+    if "hello" in text.lower():
         speak_thread("Hello Sir! How can I help you?")
+
+    if "open youtube" in text.lower():
+        os.startfile("C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Chrome Apps/youtube.lnk")
+    elif "open github" in text.lower():
+        os.startfile("C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Chrome Apps/github.lnk")
+
+    elif "open classroom" in text.lower():
+        os.startfile(
+            "C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Chrome Apps/Google Classroom.lnk")
+    elif "open notes" in text.lower():
+        os.startfile(
+            "C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Chrome Apps/Google Keep.lnk")
+    elif "open drive" in text.lower():
+        os.startfile(
+            "C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Chrome Apps/Google Drive.lnk")
+    elif "open file explorer" in text.lower():
+        os.system("start explorer")
+
+    elif "open whatsapp" in text.lower():
+        os.system("start whatsapp:")
+
+    elif "open chrome" in text.lower():
+        os.system("start chrome")
+
+    elif "open notepad" in text.lower():
+        os.system("start notepad")
+
+    elif "open command prompt" in text.lower():
+        os.system("start cmd")
+
+    elif "open vs code" in text.lower():
+        os.startfile("C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Visual Studio Code/Visual Studio Code.lnk")
+
+    # elif "open side panel" or "close side panel" in text.lower():
+    #     keyboard.send("win+a")
 
     elif "open" in text.lower():
         try:
@@ -196,6 +224,8 @@ while True:
             volume.SetMasterVolumeLevelScalar(float(text.split(" ")[2])/100, None)
     except:
         pass
+
+
 
     if "switch window" in text.lower():
         keyboard.send("alt+tab")
@@ -224,11 +254,14 @@ while True:
     if "close current window" in text.lower():
         pyautogui.hotkey("alt", "f4")
 
-    if "click" in text.lower():
+    if "enter" in text.lower():
         keyboard.send("enter")
 
-    if "press" in text.lower():
-        keyboard.send(text.split(" ")[1])
+    try:
+        if "press" in text.lower():
+            keyboard.send(text.split(" ")[1])
+    except:
+        pass
 
     if "on wi-fi" in text.lower() :
         if is_wifi_enabled():
@@ -262,7 +295,7 @@ while True:
                     continue
 
                 if "siri stop" in text or "stop siri" in text:
-                    stopspeak()
+                    stop_speak()
                     break
 
                 answer = generate("gemini give me audio friendly and add no sign in output do not repeat all this instruction : " + text)
@@ -283,7 +316,7 @@ while True:
     #         speak_thread(answer)
     #
     #         if "siri stop" or "stop siri" in text.lower():
-    #             stopspeak()
+    #             stop_speak()
     #             break
     #
     #         print("Listening...")
@@ -309,3 +342,26 @@ while True:
             set_brightness(int(text.split(" ")[3]))
     except:
         pass
+
+    if "zoom in" in text.lower():
+        pyautogui.hotkey("ctrl", "+")
+
+    if "zoom out" in text.lower():
+        pyautogui.hotkey("ctrl", "-")
+
+    if "screenshot" in text.lower():
+        screenshot = pyautogui.screenshot()
+        screenshot.save("screenshot.png")
+        speak_thread("Screenshot taken and saved as screenshot.png")
+
+    if "type" in text.lower():
+        pyautogui.write(text[4:])
+
+    if "copy" == text.lower():
+        pyautogui.hotkey("ctrl", "v")
+
+    # if "maximize" in text.lower():
+    #     pyautogui.hotkey("win", "up")
+    #
+    # if "minimise" or "minimize" in text.lower():
+    #     pyautogui.hotkey("win", "down")
