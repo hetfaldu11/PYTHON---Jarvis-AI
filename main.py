@@ -1,6 +1,6 @@
 import webbrowser
 from operator import truediv
-
+import requests
 import speech_recognition as sr
 import time
 import keyboard
@@ -118,6 +118,35 @@ def generate(text):
         answer += chunk.text
     return answer
 
+global data
+data = ""
+with open("C:/Users/LENOVO/OneDrive/Desktop/coding/PYTHON/JarvisAI.py", "r", encoding="utf-8") as file:
+    data = file.read()
+
+def command_filter(command):
+    # Read the file with UTF-8 encoding
+
+    # Your active webhook URL
+    url = "https://hetfaldu.app.n8n.cloud/webhook/2de6ca91-527d-4708-9b70-a8cd65983321"
+    # url = "https://hetfaldu.app.n8n.cloud/webhook-test/2de6ca91-527d-4708-9b70-a8cd65983321"
+
+    headers = {
+        "Content-Type": "application/json"
+        # "Accept": "application/json"
+    }
+
+    # Send request to n8n
+    response = requests.post(url, json={"Data": data, "Command": command}, headers=headers)
+
+    if response.ok:
+        print("✅ Workflow triggered successfully.")
+    else:
+        print("❌ Trigger failed. Status:", response.status_code)
+        print("Response:", response.text)
+
+    print(response.text)
+    return response.text
+
 def takecommand():
     r = sr.Recognizer()
     with sr.Microphone() as source:
@@ -159,6 +188,7 @@ volume = cast(interface, POINTER(IAudioEndpointVolume))
 while True:
     print("Listening...")
     text = takecommand().lower()
+    text = command_filter(text)
     if text == "":
         continue
     # speak(text)
@@ -207,7 +237,7 @@ while True:
         except:
             pass
 
-
+    # give song name
     if "play" in text.lower():
         open_song_in_browser(text.split(" ")[1])
 
@@ -219,6 +249,7 @@ while True:
         current_volume = volume.GetMasterVolumeLevelScalar()
         volume.SetMasterVolumeLevelScalar(current_volume - 0.1, None)
 
+    #give volume level
     try:
         if "volume set" in text.lower():
             volume.SetMasterVolumeLevelScalar(float(text.split(" ")[2])/100, None)
