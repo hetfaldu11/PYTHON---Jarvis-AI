@@ -1,5 +1,4 @@
 import webbrowser
-from operator import truediv
 import requests
 import speech_recognition as sr
 import time
@@ -11,25 +10,29 @@ import spotipy
 import threading
 import wmi
 import os
+import sqlite3
+import datetime
 from google import genai
 from google.genai import types
 from spotipy.oauth2 import SpotifyClientCredentials
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
-from API_KEY import GEMINI_API_KEY
-from API_KEY import conversation_number
+from API_KEY import GEMINI_API_KEY, conversation_number
 import google.generativeai as genai2
+
 speaker = win32com.client.Dispatch("SAPI.SpVoice")
 
 genai2.configure(api_key=GEMINI_API_KEY)
 model = genai2.GenerativeModel("gemini-2.0-flash")
+
 
 def generate_clean_query(user_input):
     # Optional Gemini cleaning or intent extraction
     prompt = f"Extract the search query from this sentence: '{user_input}'"
     response = model.generate_content(prompt)
     return response.text.strip().strip('"')
+
 
 def universal_search(query):
     pyautogui.hotkey('/')
@@ -38,7 +41,8 @@ def universal_search(query):
     pyautogui.write(query)
     pyautogui.press('enter')
 
-def update_variable_in_file(new_value,filename="API_KEY.py", var_name="conversation_number"):
+
+def update_variable_in_file(new_value, filename="API_KEY.py", var_name="conversation_number"):
     with open(filename, 'r') as f:
         lines = f.readlines()
 
@@ -48,6 +52,7 @@ def update_variable_in_file(new_value,filename="API_KEY.py", var_name="conversat
                 f.write(f"{var_name} = {new_value}\n")
             else:
                 f.write(line)
+
 
 def get_brightness():
     w = wmi.WMI(namespace='wmi')
@@ -72,15 +77,19 @@ def set_brightness(level):
     else:
         print("Could not access brightness control.")
 
+
 def speak(text):
     speaker.Speak(text, 1)  # '1' makes it async (non-blocking)
     return text
 
+
 def speak_thread(text):
     threading.Thread(target=speak, args=(text,)).start()
 
+
 def stop_speak():
     speaker.Speak("", 3)
+
 
 def is_wifi_enabled():
     # Check network interfaces
@@ -89,6 +98,7 @@ def is_wifi_enabled():
             if interface in psutil.net_if_stats() and psutil.net_if_stats()[interface].isup:
                 return True  # If interface is up, Wi-Fi is enabled
     return False
+
 
 def generate(text):
     # api_key = os.environ.get("GEMINI_API_KEY")
@@ -111,17 +121,19 @@ def generate(text):
     answer = ""
 
     for chunk in client.models.generate_content_stream(
-        model=model,
-        contents=contents,
-        config=generate_content_config,
+            model=model,
+            contents=contents,
+            config=generate_content_config,
     ):
         answer += chunk.text
     return answer
+
 
 global data
 data = ""
 with open("C:/Users/LENOVO/OneDrive/Desktop/coding/PYTHON/JarvisAI.py", "r", encoding="utf-8") as file:
     data = file.read()
+
 
 def command_filter(command):
     # Read the file with UTF-8 encoding
@@ -147,6 +159,7 @@ def command_filter(command):
     print(response.text)
     return response.text
 
+
 def takecommand():
     r = sr.Recognizer()
     with sr.Microphone() as source:
@@ -160,6 +173,7 @@ def takecommand():
             print(e)
             print("Say that again please...")
             return "Error occured while listening"
+
 
 def open_song_in_browser(song_name):
     sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
@@ -178,7 +192,67 @@ def open_song_in_browser(song_name):
 
     os.system(f'start {song_url}')
 
+
 print(speak("Hello I am Jarvis A.I."))
+
+
+def get_current_time():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+import sqlite3
+from datetime import datetime
+
+def get_current_time():
+    return datetime.now().isoformat()
+
+def save_to_database_alexa(command, response):
+    conn = sqlite3.connect('Conversation_Alexa.db')
+    cursor = conn.cursor()
+
+    # Create table if it doesn't exist
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS commands(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            command TEXT,
+            response TEXT
+        )
+    ''')
+
+    # Insert command into the table
+    cursor.execute('''
+        INSERT INTO commands (timestamp, command, response)
+        VALUES (?, ?, ?)
+    ''', (get_current_time(), command, response))
+
+    conn.commit()
+    conn.close()
+
+
+def save_to_database_jarvis(user_command, response):
+    conn = sqlite3.connect('Conversation_Jarvis.db')
+    cursor = conn.cursor()
+
+    # ❗ Fixed: Added missing comma after AUTOINCREMENT
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS commands (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            command TEXT,
+            response TEXT
+        )
+    ''')
+
+    # Insert command into the table
+    cursor.execute('''
+        INSERT INTO commands (timestamp, command, response)
+        VALUES (?, ?, ?)
+                   ''', (get_current_time(), user_command, response))
+
+    conn.commit()
+    conn.close()
+
 
 # Get default audio device (speakers/headphones)
 devices = AudioUtilities.GetSpeakers()
@@ -187,11 +261,12 @@ volume = cast(interface, POINTER(IAudioEndpointVolume))
 
 while True:
     print("Listening...")
-    text = takecommand().lower()
-    text = command_filter(text)
+    user = takecommand().lower()
+    text = command_filter(user)
     if text == "":
         continue
     # speak(text)
+    save_to_database_jarvis(user, text)
     if "hello" in text.lower():
         speak_thread("Hello Sir! How can I help you?")
 
@@ -225,7 +300,8 @@ while True:
         os.system("start cmd")
 
     elif "open vs code" in text.lower():
-        os.startfile("C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Visual Studio Code/Visual Studio Code.lnk")
+        os.startfile(
+            "C:/Users/LENOVO/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Visual Studio Code/Visual Studio Code.lnk")
 
     # elif "open side panel" or "close side panel" in text.lower():
     #     keyboard.send("win+a")
@@ -249,14 +325,12 @@ while True:
         current_volume = volume.GetMasterVolumeLevelScalar()
         volume.SetMasterVolumeLevelScalar(current_volume - 0.1, None)
 
-    #give volume level
+    # give volume level
     try:
         if "volume set" in text.lower():
-            volume.SetMasterVolumeLevelScalar(float(text.split(" ")[2])/100, None)
+            volume.SetMasterVolumeLevelScalar(float(text.split(" ")[2]) / 100, None)
     except:
         pass
-
-
 
     if "switch window" in text.lower():
         keyboard.send("alt+tab")
@@ -294,7 +368,7 @@ while True:
     except:
         pass
 
-    if "on wi-fi" in text.lower() :
+    if "on wi-fi" in text.lower():
         if is_wifi_enabled():
             speak_thread("Wi-Fi is already enabled")
         else:
@@ -316,7 +390,8 @@ while True:
         keyboard.send("right")
         keyboard.send("enter")
 
-    if "siri" in text.lower():
+    if "alexa" in text.lower():
+        print(speak_thread("Alexa command detected"))
         while True:
             try:
                 print("Listening...")
@@ -325,36 +400,18 @@ while True:
                 if text == "":
                     continue
 
-                if "siri stop" in text or "stop siri" in text:
+                if "alexa stop" in text or "stop alexa" in text:
                     stop_speak()
                     break
 
-                answer = generate("gemini give me audio friendly and add no sign in output do not repeat all this instruction : " + text)
+                answer = generate(
+                    "Give me a short and clear answer that is easy to listen to using text-to-speech. Avoid long explanations, disclaimers, or repeating instructions. Do not mention that this is audio-friendly. Just respond directly. Text : " + text)
+                save_to_database_alexa(text, answer)
                 speak_thread(answer)
 
             except Exception as e:
                 print(f"Error: {e}")
                 continue
-
-    # if "siri" in text.lower():
-    #     answer = generate("gemini give me audio frienly output not writing this" + text[4:])
-    #     speak_thread(answer)
-    #     while True:
-    #         if text == "":
-    #             continue
-    #
-    #         answer = generate("gemini give me audio frienly output not writing this" + text[4:])
-    #         speak_thread(answer)
-    #
-    #         if "siri stop" or "stop siri" in text.lower():
-    #             stop_speak()
-    #             break
-    #
-    #         print("Listening...")
-    #         try:
-    #             text = takecommand().lower()
-    #         except:
-    #             pass
 
     if "search for" in text.lower():
         clean_query = generate_clean_query(text)  # Use Gemini to extract the key part
@@ -388,8 +445,12 @@ while True:
     if "type" in text.lower():
         pyautogui.write(text[4:])
 
-    if "copy" == text.lower():
+    if "paste" == text.lower():
         pyautogui.hotkey("ctrl", "v")
+
+    if "exit jarvis" in text.lower():
+        speak_thread("Goodbye..... Sir!")
+        break
 
     # if "maximize" in text.lower():
     #     pyautogui.hotkey("win", "up")
