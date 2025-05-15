@@ -193,71 +193,128 @@ def open_song_in_browser(song_name):
     os.system(f'start {song_url}')
 
 
-print(speak("Hello I am Jarvis A.I."))
-
-
 def get_current_time():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-import sqlite3
-from datetime import datetime
-
-def get_current_time():
-    return datetime.now().isoformat()
-
-def save_to_database_alexa(command, response):
+def save_to_database_alexa(command, response=""):
     conn = sqlite3.connect('Conversation_Alexa.db')
     cursor = conn.cursor()
 
     # Create table if it doesn't exist
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS commands(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT,
-            command TEXT,
-            response TEXT
-        )
-    ''')
+                   CREATE TABLE IF NOT EXISTS commands
+                   (
+                       id
+                       INTEGER
+                       PRIMARY
+                       KEY
+                       AUTOINCREMENT,
+                       timestamp
+                       TEXT,
+                       command
+                       TEXT,
+                       response
+                       TEXT
+                   )
+                   ''')
 
     # Insert command into the table
     cursor.execute('''
-        INSERT INTO commands (timestamp, command, response)
-        VALUES (?, ?, ?)
-    ''', (get_current_time(), command, response))
+                   INSERT INTO commands (timestamp, command, response)
+                   VALUES (?, ?, ?)
+                   ''', (get_current_time(), command, response))
 
     conn.commit()
     conn.close()
 
 
-def save_to_database_jarvis(user_command, response):
+def save_to_database_jarvis(user_command, response=""):
     conn = sqlite3.connect('Conversation_Jarvis.db')
     cursor = conn.cursor()
 
     # ❗ Fixed: Added missing comma after AUTOINCREMENT
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS commands (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT,
-            command TEXT,
-            response TEXT
-        )
-    ''')
+                   CREATE TABLE IF NOT EXISTS commands
+                   (
+                       id
+                       INTEGER
+                       PRIMARY
+                       KEY
+                       AUTOINCREMENT,
+                       timestamp
+                       TEXT,
+                       command
+                       TEXT,
+                       response
+                       TEXT
+                   )
+                   ''')
 
     # Insert command into the table
     cursor.execute('''
-        INSERT INTO commands (timestamp, command, response)
-        VALUES (?, ?, ?)
+                   INSERT INTO commands (timestamp, command, response)
+                   VALUES (?, ?, ?)
                    ''', (get_current_time(), user_command, response))
 
     conn.commit()
     conn.close()
 
 
+def read_alexa_database():
+    conn = sqlite3.connect('Conversation_Alexa.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM commands ORDER BY id ASC")
+    data = cursor.fetchall()
+    conn.close()
+    return data
+
+
+def format_history(data):
+    return "\n".join([f"User: {row[2]}\nAlexa: {row[3]}" for row in data])
+
+
+def read_jarvis_database():
+    conn = sqlite3.connect('Conversation_Jarvis.db')
+    cursor = conn.cursor()
+
+    cursor.execute('''SELECT *
+                      FROM commands''')
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def command_filter_alexa(command):
+    url = "https://hetfaldu.app.n8n.cloud/webhook/TestforAlexa"
+
+    payload = {
+        "conversation history": format_history(read_alexa_database()),
+        "command": command
+    }
+
+    headers = {
+        'Content-Type': 'application/json'
+    }
+
+    response = requests.post(url, json=payload, headers=headers)
+
+    if response.ok:
+        print("✅ Workflow triggered successfully.")
+    else:
+        print("❌ Trigger failed. Status:", response.status_code)
+        print("Response:", response.text)
+
+    return response.text
+
+
 # Get default audio device (speakers/headphones)
 devices = AudioUtilities.GetSpeakers()
 interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
 volume = cast(interface, POINTER(IAudioEndpointVolume))
+
+print(speak("Hello I am Jarvis A.I."))
+save_to_database_jarvis("Jarvis Started")
 
 while True:
     print("Listening...")
@@ -391,7 +448,8 @@ while True:
         keyboard.send("enter")
 
     if "alexa" in text.lower():
-        print(speak_thread("Alexa command detected"))
+        print(speak_thread("Command transfer to Alexa"))
+        save_to_database_alexa("Alexa Started")
         while True:
             try:
                 print("Listening...")
@@ -402,10 +460,39 @@ while True:
 
                 if "alexa stop" in text or "stop alexa" in text:
                     stop_speak()
+                    save_to_database_alexa("Alexa Stopped")
                     break
 
-                answer = generate(
-                    "Give me a short and clear answer that is easy to listen to using text-to-speech. Avoid long explanations, disclaimers, or repeating instructions. Do not mention that this is audio-friendly. Just respond directly. Text : " + text)
+                # history = read_alexa_database()
+                # answer = generate(
+                #     f"Give me a short and clear answer that is easy to listen to using text-to-speech. Avoid long explanations, disclaimers, or repeating instructions. Do not mention that this is audio-friendly.This is previous command and response and timestamp : {history} Just respond directly. Text : " + text)
+
+                # history = read_alexa_database()
+
+                # Format history as readable conversation
+                # formatted_history = ""
+                # for row in history[0:]:  # last 5 entries only
+                #     formatted_history += f"\nUser: {row[2]}\nAlexa: {row[3]}\n"
+                #
+                # prompt = (
+                #     "Give me a short and clear answer that is easy to listen to using text-to-speech. "
+                #     "Avoid long explanations or disclaimers. Respond directly.\n\n"
+                #     f"Conversation history:\n{formatted_history}\n"
+                #     f"New User Command: {text}"
+                # )
+
+                # formatted_history = format_history(read_alexa_database())
+
+                # prompt = (
+                #     "You're a voice assistant named Alexa. Respond briefly and naturally, as if continuing a conversation.\n\n"
+                #     f"Full conversation history:\n{formatted_history}\n\n"
+                #     f"User: {text}\nAlexa:"
+                # )
+
+                # answer = generate(prompt)
+
+                answer = command_filter_alexa(text)
+                print(answer)
                 save_to_database_alexa(text, answer)
                 speak_thread(answer)
 
@@ -450,6 +537,7 @@ while True:
 
     if "exit jarvis" in text.lower():
         speak_thread("Goodbye..... Sir!")
+        save_to_database_jarvis("Jarvis Stopped")
         break
 
     # if "maximize" in text.lower():
