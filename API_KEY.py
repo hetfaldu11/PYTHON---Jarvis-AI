@@ -1,2 +1,2 @@
-GEMINI_API_KEY = "AIzaSyBzvrT3lEYTeOT_LtijEiM_4YwTjwjZleQ"
+GEMINI_API_KEY = "YOUR OWN GEMINI API KEY"
 conversation_number = 1
